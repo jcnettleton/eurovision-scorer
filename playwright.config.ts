@@ -18,10 +18,19 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: true,
-    timeout: 15000,
-  },
+  // Start the Express server first, then Vite (which proxies /api to Express)
+  webServer: [
+    {
+      command: 'node server.js',
+      url: 'http://localhost:3001/api/state',
+      timeout: 10000,
+      reuseExistingServer: true,
+    },
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:5173',
+      timeout: 15000,
+      reuseExistingServer: true,
+    },
+  ],
 });

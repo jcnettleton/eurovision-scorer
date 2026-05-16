@@ -1,136 +1,87 @@
-import { useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import { COUNTRIES } from './data/countries';
-import { calculateAverage, sortEntries } from './utils/scoring';
+import { sortEntries } from './utils/scoring';
 import ControlDesk from './components/ControlDesk';
 import JudgeManager from './components/JudgeManager';
 import Leaderboard from './components/Leaderboard';
-
-const STORAGE_KEY = 'eurovision-2026';
-
-const DEFAULT_STATE = {
-  judges: ['Alice', 'Bob', 'Charlie', 'Dave'],
-  entries: COUNTRIES.map(({ country, song, artist, order }) => ({
-    country,
-    song,
-    artist,
-    order,
-    scores: {},
-    average: null,
-  })),
-};
 
 function fireConfetti() {
   const end = Date.now() + 2200;
   const colors = ['#ff0080', '#9d4edd', '#00d4ff', '#ffd700', '#ffffff'];
   (function burst() {
-    confetti({
-      particleCount: 7,
-      angle: 60,
-      spread: 65,
-      origin: { x: 0 },
-      colors,
-    });
-    confetti({
-      particleCount: 7,
-      angle: 120,
-      spread: 65,
-      origin: { x: 1 },
-      colors,
-    });
+    confetti({ particleCount: 7, angle: 60,  spread: 65, origin: { x: 0 }, colors });
+    confetti({ particleCount: 7, angle: 120, spread: 65, origin: { x: 1 }, colors });
     if (Date.now() < end) requestAnimationFrame(burst);
   })();
 }
 
+// ── thin API helpers ──────────────────────────────────────────────────────────
+
+async function api(path, body) {
+  await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export default function App() {
-  const [appState, setAppState] = useLocalStorage(STORAGE_KEY, DEFAULT_STATE);
+  const [appState, setAppState] = useState(null); // null = loading
   const prevFirstRef = useRef(null);
 
-  // ── Derived sorted entries ──
-  const sortedEntries = sortEntries(appState.entries);
+  // ── Connect to SSE stream; server pushes full state on every change ──────
+  useEffect(() => {
+    const es = new EventSource('/api/events');
 
-  // ── Score submission ──
-  const handleSubmit = useCallback(
-    (country, scoresInput) => {
-      setAppState((prev) => {
-        const newEntries = prev.entries.map((entry) => {
-          if (entry.country !== country) return entry;
-          // Merge new scores over existing (allows partial submission)
-          const merged = { ...entry.scores };
-          prev.judges.forEach((judge) => {
-            const val = scoresInput[judge];
-            if (val !== '' && val !== undefined && val !== null) {
-              merged[judge] = Number(val);
-            }
-          });
-          return { ...entry, scores: merged, average: calculateAverage(merged) };
-        });
+    es.onmessage = (e) => {
+      const next = JSON.parse(e.data);
+      setAppState(next);
 
-        const sorted = sortEntries(newEntries);
-        const newFirst = sorted.find((e) => e.average !== null)?.country ?? null;
-        if (newFirst && newFirst !== prevFirstRef.current) {
-          prevFirstRef.current = newFirst;
-          setTimeout(fireConfetti, 50);
-        }
+      // Confetti when the #1 spot changes
+      const sorted = sortEntries(next.entries);
+      const newFirst = sorted.find(en => en.average !== null)?.country ?? null;
+      if (newFirst && newFirst !== prevFirstRef.current) {
+        prevFirstRef.current = newFirst;
+        setTimeout(fireConfetti, 50);
+      }
+    };
 
-        return { ...prev, entries: newEntries };
-      });
-    },
-    [setAppState]
-  );
+    es.onerror = () => {
+      // Browser will auto-reconnect; nothing to do here
+    };
 
-  // ── Judge management ──
-  const handleAddJudge = useCallback(
-    (name) => {
-      if (!name.trim() || appState.judges.includes(name.trim())) return;
-      setAppState((prev) => ({ ...prev, judges: [...prev.judges, name.trim()] }));
-    },
-    [appState.judges, setAppState]
-  );
+    return () => es.close();
+  }, []);
 
-  const handleRenameJudge = useCallback(
-    (oldName, newName) => {
-      const trimmed = newName.trim();
-      if (!trimmed || trimmed === oldName || appState.judges.includes(trimmed)) return;
-      setAppState((prev) => ({
-        ...prev,
-        judges: prev.judges.map((j) => (j === oldName ? trimmed : j)),
-        entries: prev.entries.map((entry) => {
-          const scores = { ...entry.scores };
-          if (oldName in scores) {
-            scores[trimmed] = scores[oldName];
-            delete scores[oldName];
-          }
-          return { ...entry, scores, average: calculateAverage(scores) };
-        }),
-      }));
-    },
-    [appState.judges, setAppState]
-  );
+  // ── Mutations — fire and forget; SSE echo updates state everywhere ────────
 
-  const handleRemoveJudge = useCallback(
-    (name) => {
-      setAppState((prev) => ({
-        ...prev,
-        judges: prev.judges.filter((j) => j !== name),
-        entries: prev.entries.map((entry) => {
-          const scores = { ...entry.scores };
-          delete scores[name];
-          return { ...entry, scores, average: calculateAverage(scores) };
-        }),
-      }));
-    },
-    [setAppState]
-  );
+  const handleSubmit    = useCallback((country, scores) =>
+    api('/api/score', { country, scores }), []);
 
-  // ── Hard reset ──
+  const handleAddJudge  = useCallback((name) =>
+    api('/api/judges/add', { name }), []);
+
+  const handleRenameJudge = useCallback((oldName, newName) =>
+    api('/api/judges/rename', { oldName, newName }), []);
+
+  const handleRemoveJudge = useCallback((name) =>
+    api('/api/judges/remove', { name }), []);
+
   const handleReset = useCallback(() => {
-    if (window.confirm('Reset ALL scores and start fresh? This cannot be undone.')) {
-      prevFirstRef.current = null;
-      setAppState(DEFAULT_STATE);
-    }
-  }, [setAppState]);
+    if (window.confirm('Reset ALL scores and start fresh? This cannot be undone.'))
+      api('/api/reset', {});
+  }, []);
+
+  // ── Loading state while waiting for first SSE message ────────────────────
+  if (!appState) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p style={{ color: 'var(--text-muted)' }}>Connecting to scorer…</p>
+      </div>
+    );
+  }
+
+  const sortedEntries = sortEntries(appState.entries);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -159,10 +110,7 @@ export default function App() {
             entries={appState.entries}
             onSubmit={handleSubmit}
           />
-          <button
-            className="btn btn-danger w-full mt-auto"
-            onClick={handleReset}
-          >
+          <button className="btn btn-danger w-full mt-auto" onClick={handleReset}>
             Hard Reset
           </button>
         </aside>

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "node server.js",
+    "party": "concurrently -n server,vite -c magenta,cyan \"node server.js\" \"vite\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -12,6 +14,8 @@
   "dependencies": {
     "@formkit/auto-animate": "^0.9.0",
     "canvas-confetti": "^1.9.4",
+    "concurrently": "^9.2.1",
+    "express": "^5.2.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

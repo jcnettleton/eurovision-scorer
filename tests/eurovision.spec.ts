@@ -1,11 +1,13 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, request } from '@playwright/test';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
-async function clearStorage(page: Page) {
-  await page.evaluate(() => localStorage.clear());
+/** Reset server state before each test — replaces the old localStorage.clear() */
+async function resetState(page: Page) {
+  const ctx = await request.newContext();
+  await ctx.post('http://localhost:3001/api/reset');
+  await ctx.dispose();
   await page.reload();
-  // Wait for the app to fully render
   await page.waitForSelector('[data-testid="submit-btn"]');
 }
 
@@ -25,8 +27,6 @@ async function submitScore(page: Page) {
   await page.locator('[data-testid="submit-btn"]').click();
 }
 
-// ── Judge list helpers (scoped to judges panel) ──────────────────────────────
-
 function judgeItems(page: Page) {
   return page.locator('[data-testid="judge-item"]');
 }
@@ -37,7 +37,7 @@ test.describe('Eurovision 2026 Scorer', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await clearStorage(page);
+    await resetState(page);
   });
 
   // ── Page load & structure ─────────────────────────────────────────────────
@@ -80,17 +80,14 @@ test.describe('Eurovision 2026 Scorer', () => {
   });
 
   test('submit button is disabled when no country selected', async ({ page }) => {
-    const submitBtn = page.locator('[data-testid="submit-btn"]');
-    await expect(submitBtn).toBeDisabled();
+    await expect(page.locator('[data-testid="submit-btn"]')).toBeDisabled();
   });
 
   // ── Score submission ──────────────────────────────────────────────────────
 
   test('score inputs appear after selecting a country', async ({ page }) => {
     await selectCountry(page, 'Sweden');
-    // 4 number inputs — one per default judge
-    const inputs = page.locator('input[type="number"]');
-    await expect(inputs).toHaveCount(4);
+    await expect(page.locator('input[type="number"]')).toHaveCount(4);
   });
 
   test('submitting scores adds country to leaderboard', async ({ page }) => {
@@ -99,8 +96,7 @@ test.describe('Eurovision 2026 Scorer', () => {
     await fillScore(page, 'Bob', 8);
     await submitScore(page);
 
-    const rows = page.locator('.leaderboard-row');
-    await expect(rows.first()).toContainText('Sweden');
+    await expect(page.locator('.leaderboard-row').first()).toContainText('Sweden');
   });
 
   test('average is calculated and displayed correctly', async ({ page }) => {
@@ -111,9 +107,9 @@ test.describe('Eurovision 2026 Scorer', () => {
     await fillScore(page, 'Dave', 8);
     await submitScore(page);
 
-    // Average of 8,6,10,8 = 8.00
-    const row = page.locator('.leaderboard-row').filter({ hasText: 'Norway' });
-    await expect(row).toContainText('8.00');
+    // 8+6+10+8 / 4 = 8.00
+    await expect(page.locator('.leaderboard-row').filter({ hasText: 'Norway' }))
+      .toContainText('8.00');
   });
 
   test('score clamped to 0–10 range (above max)', async ({ page }) => {
@@ -121,8 +117,7 @@ test.describe('Eurovision 2026 Scorer', () => {
     const input = page.locator('input[type="number"]').first();
     await input.fill('15');
     await input.blur();
-    const val = await input.inputValue();
-    expect(Number(val)).toBeLessThanOrEqual(10);
+    expect(Number(await input.inputValue())).toBeLessThanOrEqual(10);
   });
 
   test('score clamped to 0–10 range (below min)', async ({ page }) => {
@@ -130,24 +125,20 @@ test.describe('Eurovision 2026 Scorer', () => {
     const input = page.locator('input[type="number"]').first();
     await input.fill('-3');
     await input.blur();
-    const val = await input.inputValue();
-    expect(Number(val)).toBeGreaterThanOrEqual(0);
+    expect(Number(await input.inputValue())).toBeGreaterThanOrEqual(0);
   });
 
   test('submitting for the same country updates instead of duplicating', async ({ page }) => {
-    // First submission
     await selectCountry(page, 'Austria');
     await fillScore(page, 'Alice', 5);
     await submitScore(page);
-    await page.waitForTimeout(1500); // wait for form reset
+    await page.waitForTimeout(1500);
 
-    // Second submission (update)
     await selectCountry(page, 'Austria');
     await fillScore(page, 'Alice', 9);
     await submitScore(page);
     await page.waitForTimeout(500);
 
-    // Must have exactly 1 Austria row in the leaderboard
     const austriaRows = page.locator('.leaderboard-row').filter({ hasText: 'Austria' });
     await expect(austriaRows).toHaveCount(1);
     await expect(austriaRows).toContainText('9.00');
@@ -167,11 +158,8 @@ test.describe('Eurovision 2026 Scorer', () => {
     await page.waitForTimeout(500);
 
     const rows = page.locator('[data-testid="leaderboard-list"] li');
-    const firstText = await rows.first().textContent();
-    expect(firstText).toContain('Norway');
-
-    const secondText = await rows.nth(1).textContent();
-    expect(secondText).toContain('Sweden');
+    expect(await rows.first().textContent()).toContain('Norway');
+    expect(await rows.nth(1).textContent()).toContain('Sweden');
   });
 
   test('unscored countries appear below a divider', async ({ page }) => {
@@ -210,6 +198,7 @@ test.describe('Eurovision 2026 Scorer', () => {
   test('can add a new judge', async ({ page }) => {
     await page.getByPlaceholder('New judge name…').fill('Eve');
     await page.getByRole('button', { name: 'Add' }).click();
+    await page.waitForTimeout(300);
 
     await expect(judgeItems(page)).toHaveCount(5);
     await expect(judgeItems(page).last()).toContainText('Eve');
@@ -217,17 +206,15 @@ test.describe('Eurovision 2026 Scorer', () => {
 
   test('cannot add a duplicate judge name', async ({ page }) => {
     await page.getByPlaceholder('New judge name…').fill('Alice');
-    const addBtn = page.getByRole('button', { name: 'Add' });
-    await expect(addBtn).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Add' })).toBeDisabled();
   });
 
   test('can rename a judge', async ({ page }) => {
     const firstJudge = judgeItems(page).first();
     await firstJudge.getByTitle('Rename judge').click();
-
-    const renameInput = firstJudge.locator('input');
-    await renameInput.fill('Alicia');
+    await firstJudge.locator('input').fill('Alicia');
     await firstJudge.getByRole('button', { name: '✓' }).click();
+    await page.waitForTimeout(300);
 
     await expect(judgeItems(page).first()).toContainText('Alicia');
   });
@@ -235,61 +222,58 @@ test.describe('Eurovision 2026 Scorer', () => {
   test('rename propagates to score inputs in Control Desk', async ({ page }) => {
     const firstJudge = judgeItems(page).first();
     await firstJudge.getByTitle('Rename judge').click();
-    const renameInput = firstJudge.locator('input');
-    await renameInput.fill('Alicia');
+    await firstJudge.locator('input').fill('Alicia');
     await firstJudge.getByRole('button', { name: '✓' }).click();
+    await page.waitForTimeout(300);
 
     await selectCountry(page, 'Malta');
     await expect(page.locator('label', { hasText: 'Alicia' })).toBeVisible();
   });
 
   test('can remove a judge', async ({ page }) => {
-    const firstJudge = judgeItems(page).first();
-    await firstJudge.getByTitle('Remove judge').click();
+    await judgeItems(page).first().getByTitle('Remove judge').click();
+    await page.waitForTimeout(300);
 
     await expect(judgeItems(page)).toHaveCount(3);
     await expect(judgeItems(page).first()).not.toContainText('Alice');
   });
 
   test('removing a judge recalculates existing averages', async ({ page }) => {
-    // Score Denmark: Alice=10, Bob=0 → avg 5.00
     await selectCountry(page, 'Denmark');
     await fillScore(page, 'Alice', 10);
     await fillScore(page, 'Bob', 0);
     await submitScore(page);
     await page.waitForTimeout(1500);
 
-    // Remove Bob — avg should become 10.00
-    const bobJudge = judgeItems(page).filter({ hasText: 'Bob' });
-    await bobJudge.getByTitle('Remove judge').click();
-    await page.waitForTimeout(300);
+    // Remove Bob — average of Denmark should jump from 5.00 to 10.00
+    await judgeItems(page).filter({ hasText: 'Bob' }).getByTitle('Remove judge').click();
+    await page.waitForTimeout(500);
 
-    const denmarkRow = page.locator('.leaderboard-row').filter({ hasText: 'Denmark' });
-    await expect(denmarkRow).toContainText('10.00');
+    await expect(page.locator('.leaderboard-row').filter({ hasText: 'Denmark' }))
+      .toContainText('10.00');
   });
 
   test('cannot remove last remaining judge', async ({ page }) => {
     for (let i = 0; i < 3; i++) {
       await judgeItems(page).first().getByTitle('Remove judge').click();
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(150);
     }
-    const lastRemove = judgeItems(page).first().getByTitle('Remove judge');
-    await expect(lastRemove).toBeDisabled();
+    await expect(judgeItems(page).first().getByTitle('Remove judge')).toBeDisabled();
   });
 
   test('judge cap: add button disappears at 10 judges', async ({ page }) => {
-    const names = ['Eve', 'Frank', 'Grace', 'Henry', 'Iris', 'Jack'];
-    for (const name of names) {
+    for (const name of ['Eve', 'Frank', 'Grace', 'Henry', 'Iris', 'Jack']) {
       await page.getByPlaceholder('New judge name…').fill(name);
       await page.getByRole('button', { name: 'Add' }).click();
+      await page.waitForTimeout(150);
     }
     await expect(page.getByText('Maximum of 10 judges reached.')).toBeVisible();
     await expect(page.getByPlaceholder('New judge name…')).not.toBeVisible();
   });
 
-  // ── LocalStorage persistence ──────────────────────────────────────────────
+  // ── Real-time sync ────────────────────────────────────────────────────────
 
-  test('scores persist after page reload', async ({ page }) => {
+  test('scores persist after page reload (server-backed)', async ({ page }) => {
     await selectCountry(page, 'Ukraine');
     await fillScore(page, 'Alice', 8);
     await fillScore(page, 'Bob', 9);
@@ -299,14 +283,31 @@ test.describe('Eurovision 2026 Scorer', () => {
     await page.reload();
     await page.waitForSelector('.leaderboard-row');
 
-    const ukraineRow = page.locator('.leaderboard-row').filter({ hasText: 'Ukraine' });
-    await expect(ukraineRow).toContainText('8.50');
+    await expect(page.locator('.leaderboard-row').filter({ hasText: 'Ukraine' }))
+      .toContainText('8.50');
   });
 
-  test('judges persist after page reload', async ({ page }) => {
+  test('second browser tab sees live score update', async ({ page, context }) => {
+    const tab2 = await context.newPage();
+    await tab2.goto('/');
+    await tab2.waitForSelector('[data-testid="submit-btn"]');
+
+    // Score on tab 1
+    await selectCountry(page, 'Serbia');
+    await fillScore(page, 'Alice', 9);
+    await submitScore(page);
+
+    // Tab 2 should update automatically via SSE
+    await expect(tab2.locator('.leaderboard-row').filter({ hasText: 'Serbia' }))
+      .toContainText('9.00', { timeout: 3000 });
+
+    await tab2.close();
+  });
+
+  test('judges persist after page reload (server-backed)', async ({ page }) => {
     await page.getByPlaceholder('New judge name…').fill('Zelda');
     await page.getByRole('button', { name: 'Add' }).click();
-    await expect(judgeItems(page)).toHaveCount(5);
+    await page.waitForTimeout(300);
 
     await page.reload();
     await page.waitForSelector('[data-testid="judge-item"]');
@@ -323,7 +324,7 @@ test.describe('Eurovision 2026 Scorer', () => {
     await submitScore(page);
     await page.waitForTimeout(1500);
 
-    page.once('dialog', dialog => dialog.accept());
+    page.once('dialog', d => d.accept());
     await page.getByRole('button', { name: 'Hard Reset' }).click();
     await page.waitForTimeout(300);
 
@@ -336,17 +337,17 @@ test.describe('Eurovision 2026 Scorer', () => {
     await submitScore(page);
     await page.waitForTimeout(1500);
 
-    page.once('dialog', dialog => dialog.dismiss());
+    page.once('dialog', d => d.dismiss());
     await page.getByRole('button', { name: 'Hard Reset' }).click();
     await page.waitForTimeout(300);
 
-    const croatiaRow = page.locator('.leaderboard-row').filter({ hasText: 'Croatia' });
-    await expect(croatiaRow).toBeVisible();
+    await expect(page.locator('.leaderboard-row').filter({ hasText: 'Croatia' }))
+      .toBeVisible();
   });
 
   // ── Already-scored indicator ─────────────────────────────────────────────
 
-  test('shows "editing" notice when re-selecting a scored country', async ({ page }) => {
+  test('shows editing notice when re-selecting a scored country', async ({ page }) => {
     await selectCountry(page, 'Serbia');
     await fillScore(page, 'Alice', 7);
     await submitScore(page);
@@ -364,8 +365,7 @@ test.describe('Eurovision 2026 Scorer', () => {
     await page.waitForTimeout(1500);
 
     await selectCountry(page, 'Bulgaria');
-    const aliceInput = page.locator('input[type="number"]').first();
-    await expect(aliceInput).toHaveValue('6');
+    await expect(page.locator('input[type="number"]').first()).toHaveValue('6');
   });
 
 });

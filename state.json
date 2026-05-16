@@ -1,0 +1,230 @@
+{
+  "judges": [
+    "Alice",
+    "Bob",
+    "Charlie",
+    "Dave"
+  ],
+  "entries": [
+    {
+      "country": "Denmark",
+      "song": "Før vi går hjem",
+      "artist": "Søren Torpegaard Lund",
+      "order": 1,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Germany",
+      "song": "Fire",
+      "artist": "Sarah Engels",
+      "order": 2,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Israel",
+      "song": "Michelle",
+      "artist": "Noam Bettan",
+      "order": 3,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Belgium",
+      "song": "Dancing on the Ice",
+      "artist": "Essyla",
+      "order": 4,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Albania",
+      "song": "Nân",
+      "artist": "Alis",
+      "order": 5,
+      "scores": {
+        "Alice": 5,
+        "Bob": 6,
+        "Charlie": 3,
+        "Dave": 9
+      },
+      "average": 5.75
+    },
+    {
+      "country": "Greece",
+      "song": "Ferto",
+      "artist": "Akylas",
+      "order": 6,
+      "scores": {
+        "Alice": 2,
+        "Bob": 9,
+        "Charlie": 5,
+        "Dave": 8
+      },
+      "average": 6
+    },
+    {
+      "country": "Ukraine",
+      "song": "Ridnym",
+      "artist": "Leléka",
+      "order": 7,
+      "scores": {
+        "Alice": 5,
+        "Bob": 5,
+        "Charlie": 5,
+        "Dave": 5
+      },
+      "average": 5
+    },
+    {
+      "country": "Australia",
+      "song": "Eclipse",
+      "artist": "Delta Goodrem",
+      "order": 8,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Serbia",
+      "song": "Kraj mene",
+      "artist": "Lavina",
+      "order": 9,
+      "scores": {
+        "Alice": 5,
+        "Bob": 5,
+        "Charlie": 5,
+        "Dave": 5
+      },
+      "average": 5
+    },
+    {
+      "country": "Malta",
+      "song": "Bella",
+      "artist": "Aidan",
+      "order": 10,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Czechia",
+      "song": "Crossroads",
+      "artist": "Daniel Žižka",
+      "order": 11,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Bulgaria",
+      "song": "Bangaranga",
+      "artist": "Dara",
+      "order": 12,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Croatia",
+      "song": "Andromeda",
+      "artist": "Lelek",
+      "order": 13,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "United Kingdom",
+      "song": "Eins, Zwei, Drei",
+      "artist": "Look Mum No Computer",
+      "order": 14,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "France",
+      "song": "Regarde !",
+      "artist": "Monroe",
+      "order": 15,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Moldova",
+      "song": "Viva, Moldova",
+      "artist": "Satoshi",
+      "order": 16,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Finland",
+      "song": "Liekinheitin",
+      "artist": "Linda Lampenius & Pete Parkkonen",
+      "order": 17,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Poland",
+      "song": "Pray",
+      "artist": "Alicja",
+      "order": 18,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Lithuania",
+      "song": "Sólo quiero más",
+      "artist": "Lion Ceccah",
+      "order": 19,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Sweden",
+      "song": "My System",
+      "artist": "Felicia",
+      "order": 20,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Cyprus",
+      "song": "Jalla",
+      "artist": "Antigoni",
+      "order": 21,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Italy",
+      "song": "Per sempre sì",
+      "artist": "Sal Da Vinci",
+      "order": 22,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Norway",
+      "song": "Ya ya ya",
+      "artist": "Jonas Lovv",
+      "order": 23,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Romania",
+      "song": "Choke Me",
+      "artist": "Alexandra Căpitănescu",
+      "order": 24,
+      "scores": {},
+      "average": null
+    },
+    {
+      "country": "Austria",
+      "song": "Tanzschein",
+      "artist": "Cosmó",
+      "order": 25,
+      "scores": {},
+      "average": null
+    }
+  ]
+}
